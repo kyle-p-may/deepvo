@@ -5,7 +5,7 @@ RUN apt-get update \
         git \
         wget
 RUN apt-get install ffmpeg libsm6 libxext6  -y
-RUN pip install opencv-python
+RUN pip install opencv-python && pip install scipy && pip install torchvision
 RUN git clone https://github.com/utiasSTARS/pykitti.git /pykitti
 RUN cd /pykitti && python setup.py install && cd /
 ENTRYPOINT /bin/bash

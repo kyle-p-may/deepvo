@@ -4,6 +4,7 @@ from parameters import *
 
 class ConvLayer(nn.Module):
   def __init__(self, in_channels, out_channels, kernel_size, stride, dropout):
+    super().__init__()
     self.layer = nn.Sequential(
       nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=(kernel_size-1)//2, bias=True),
       nn.LeakyReLU(0.1, inplace=True),
@@ -15,6 +16,7 @@ class ConvLayer(nn.Module):
 
 class ConvLayerWithBatchNorm(nn.Module):
   def __init__(self, in_channels, out_channels, kernel_size, stride, dropout):
+    super().__init__()
     self.layer = nn.Sequential(
       nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=(kernel_size-1)//2, bias=True),
       nn.BatchNorm2d(out_channels),
@@ -27,7 +29,7 @@ class ConvLayerWithBatchNorm(nn.Module):
 
 def ConvFactory(batch_norm, in_channels, out_channels, kernel_size, stride, dropout):
   if batch_norm:
-    return ConvLayerWithBatchNorm(in_channelsm, out_channels, kernel_size, stride, dropout)
+    return ConvLayerWithBatchNorm(in_channels, out_channels, kernel_size, stride, dropout)
   else:
     return ConvLayer(in_channels, out_channels, kernel_size, stride, dropout)
 
@@ -46,7 +48,7 @@ class DeepVOModel(nn.Module):
       ConvFactory(parameters.batch_norm, parameters.channels[7], parameters.channels[8], kernel_size=parameters.kernel_size[7], stride=parameters.stride[7], dropout=parameters.conv_dropout[7]),
       ConvFactory(parameters.batch_norm, parameters.channels[8], parameters.channels[9], kernel_size=parameters.kernel_size[8], stride=parameters.stride[8], dropout=parameters.conv_dropout[8]),
       nn.LSTM(
-        input_size=1 * 6 * parameters.img_width * parameters.img_height,
+        input_size=parameters.rnn_input_size,
         hidden_size=parameters.rnn_hidden_size,
         num_layers=parameters.rnn_num_layers,
         dropout=parameters.rnn_internal_dropout,
