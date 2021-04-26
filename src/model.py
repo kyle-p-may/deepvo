@@ -37,7 +37,7 @@ class DeepVOModel(nn.Module):
   def __init__(self, parameters):
     super().__init__()
     
-    self.network = nn.Sequential(
+    self.network0 = nn.Sequential(
       ConvFactory(parameters.batch_norm, parameters.channels[0], parameters.channels[1], kernel_size=parameters.kernel_size[0], stride=parameters.stride[0], dropout=parameters.conv_dropout[0]),
       ConvFactory(parameters.batch_norm, parameters.channels[1], parameters.channels[2], kernel_size=parameters.kernel_size[1], stride=parameters.stride[1], dropout=parameters.conv_dropout[1]),
       ConvFactory(parameters.batch_norm, parameters.channels[2], parameters.channels[3], kernel_size=parameters.kernel_size[2], stride=parameters.stride[2], dropout=parameters.conv_dropout[2]),
@@ -46,17 +46,52 @@ class DeepVOModel(nn.Module):
       ConvFactory(parameters.batch_norm, parameters.channels[5], parameters.channels[6], kernel_size=parameters.kernel_size[5], stride=parameters.stride[5], dropout=parameters.conv_dropout[5]),
       ConvFactory(parameters.batch_norm, parameters.channels[6], parameters.channels[7], kernel_size=parameters.kernel_size[6], stride=parameters.stride[6], dropout=parameters.conv_dropout[6]),
       ConvFactory(parameters.batch_norm, parameters.channels[7], parameters.channels[8], kernel_size=parameters.kernel_size[7], stride=parameters.stride[7], dropout=parameters.conv_dropout[7]),
-      ConvFactory(parameters.batch_norm, parameters.channels[8], parameters.channels[9], kernel_size=parameters.kernel_size[8], stride=parameters.stride[8], dropout=parameters.conv_dropout[8]),
-      nn.LSTM(
+      ConvFactory(parameters.batch_norm, parameters.channels[8], parameters.channels[9], kernel_size=parameters.kernel_size[8], stride=parameters.stride[8], dropout=parameters.conv_dropout[8])
+    )
+    self.rnn = nn.LSTM(
         input_size=parameters.rnn_input_size,
         hidden_size=parameters.rnn_hidden_size,
         num_layers=parameters.rnn_num_layers,
         dropout=parameters.rnn_internal_dropout,
         batch_first=True
-      ),
-      nn.Dropout(parameters.rnn_dropout),
-      nn.Linear(in_features=parameters.rnn_hidden_size, out_features=6)
     )
+    self.rnn_dropout = nn.Dropout(parameters.rnn_dropout)
+    self.linear = nn.Linear(in_features=parameters.rnn_hidden_size, out_features=6)
   
-  def forward(self, xb):
-    return self.network(xb)
+  def forward(self, x):
+    # this will be {batch, seq, channel, width, height}
+    # and we want to concatenate along channel
+    x = torch.cat(( x[:, :-1], x[:, 1:]), dim=2)
+    batch_size = x.size(0)
+    seq_len = x.size(1)
+    x = x.view(batch_size * seq_len, x.size(2), x.size(3), x.size(4))
+    x = self.network0(x)
+    x = x.view(batch_size, seq_len, -1)
+
+    x, _ = self.rnn(x)
+    x = self.rnn_dropout(x)
+    return self.linear(x)
+
+  
+  def loss(self, predicted, ground_truth):
+    # both predicted and ground truth have the following structure
+    # {batch, traj, 6}
+    assert predicted.shape == ground_truth.shape, 'expecting shape to be same for loss computation'
+
+    angle_loss = nn.functional.mse_loss(predicted[:, :, :3], ground_truth[:,:,:3])
+    pos_loss = nn.functional.mse_loss(predicted[:,:,3:], ground_truth[:,:,3:])
+
+    kappa = 100
+
+    return kappa * angle_loss + pos_loss
+  
+  def training_step(self, batch):
+    images, poses, _ = batch
+    predictions = self(images)
+    training_loss = self.loss(predictions.float(), poses[:, :-1].float())
+    return training_loss
+  
+  def validation_step(self, batch):
+    images, poses, _ = batch
+    out = self(images)
+    val_loss = self.loss(out.float(), poses[:, :-1].float())

@@ -5,26 +5,26 @@ def ImportPretrainedModel(model, path, location):
   ## define a mapping from the pretrained model
   ## to my model
   pretrained_to_model = {
-    'conv1.0' : 'network.0.layer.0',
-    'conv1.1' : 'network.0.layer.1',
-    'conv2.0' : 'network.1.layer.0',
-    'conv2.1' : 'network.1.layer.1',
-    'conv3.0' : 'network.2.layer.0',
-    'conv3.1' : 'network.2.layer.1',
-    'conv3_1.0' : 'network.3.layer.0',
-    'conv3_1.1' : 'network.3.layer.1',
-    'conv4.0' : 'network.4.layer.0',
-    'conv4.1' : 'network.4.layer.1',
-    'conv4_1.0' : 'network.5.layer.0',
-    'conv4_1.1' : 'network.5.layer.1',
+    'conv1.0' : 'network0.0.layer.0',
+    'conv1.1' : 'network0.0.layer.1',
+    'conv2.0' : 'network0.1.layer.0',
+    'conv2.1' : 'network0.1.layer.1',
+    'conv3.0' : 'network0.2.layer.0',
+    'conv3.1' : 'network0.2.layer.1',
+    'conv3_1.0' : 'network0.3.layer.0',
+    'conv3_1.1' : 'network0.3.layer.1',
+    'conv4.0' : 'network0.4.layer.0',
+    'conv4.1' : 'network0.4.layer.1',
+    'conv4_1.0' : 'network0.5.layer.0',
+    'conv4_1.1' : 'network0.5.layer.1',
     'conv5.0' : 'network.6.layer.0',
     'conv5.1' : 'network.6.layer.1',
     'conv5_1.0' : 'network.7.layer.0',
     'conv5_1.1' : 'network.7.layer.1',
     'conv6.0' : 'network.8.layer.0',
     'conv6.1' : 'network.8.layer.1',
-    'rnn' : 'network.9',
-    'linear' : 'network.11'
+    'rnn' : 'rnn',
+    'linear' : 'linear'
   }
 
   # build reverse map

@@ -2,11 +2,36 @@ import numpy as np
 import os
 import torch
 from torch.utils.data.dataset import Dataset
+from torch.utils.data.dataloader import DataLoader
 import torchvision
 
 import poses as P
+import preprocessing as Prep
+from device import DeviceDataLoader
 
 class VideoDataset(Dataset):
+
+  def DataLoaderFactory(params):
+    training_ds = VideoDataset(
+      params.image_dir,
+      params.pose_dir,
+      params.training_sequences,
+      params.training_traj_length,
+      Prep.Preprocessor.TransformFactory(Prep.Preprocessor.LoadMeans(params.mean_file))
+    )
+
+    eval_ds = VideoDataset(
+      params.image_dir,
+      params.pose_dir,
+      params.eval_sequences,
+      params.eval_traj_length,
+      Prep.Preprocessor.TransformFactory(Prep.Preprocessor.LoadMeans(params.mean_file))
+    )
+    
+    t_dl = DataLoader(training_ds, batch_size=params.batch_size, shuffle=True, pin_memory=True)
+    e_dl = DataLoader(eval_ds, batch_size=params.batch_size*2, pin_memory=True)
+
+    return DeviceDataLoader(t_dl), DeviceDataLoader(e_dl)
 
   class TrajectoryInfo:
     def __init__(self, seq, start, end):
@@ -31,7 +56,9 @@ class VideoDataset(Dataset):
     self.pose_dir = pose_dir
     self.traj_info = []
     self.transform = transform
+    self.seq_info = {}
     for seq, start, end in seq_info:
+      self.seq_info[seq] = (start, end)
       for i in range(start, max(end+1-trajectory_length, start+1)):
         traj_end = min(i + trajectory_length, end + 1)
         self.traj_info.append( VideoDataset.TrajectoryInfo(seq, i, traj_end) )
@@ -47,6 +74,8 @@ class VideoDataset(Dataset):
     pose = []
     kitti_pose = []
 
+    base_img_num, _ = self.seq_info[traj.seq]
+
     for img_index in range(traj.start, traj.end):
       basename = str(img_index).zfill(10) + '.png'
       full_image_path = os.path.join(self.image_dir, traj.seq, basename)
@@ -59,7 +88,7 @@ class VideoDataset(Dataset):
 
     assert os.path.exists(pose_file), 'expecting pose file to exist'
     with open(pose_file) as ip:
-      lines = ip.readlines()[traj.start:traj.end]
+      lines = ip.readlines()[traj.start-base_img_num:traj.end-base_img_num]
       for line in lines:
         kitti = np.array([float(f) for f in line.split()])
         deepvo_pose = P.Poses.translate(kitti) 
@@ -76,4 +105,4 @@ class VideoDataset(Dataset):
       'poses': torch.from_numpy(p),
       'kitti_poses': torch.from_numpy(kp)
     }
-    return sample
+    return (sample['sequence'], sample['poses'], sample['kitti_poses'])
