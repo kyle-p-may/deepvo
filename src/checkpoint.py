@@ -8,10 +8,10 @@ class Checkpointer:
     self.load_loc = load_loc
 
   def CreateStringFromDate(self, date=datetime.now()):
-    return str(date.replace(" ", "_"))
+    return str(date).replace(" ", "_")[:-7]
 
   def CreateDateFromString(self, string_rep):
-    return datetime.strptime(string_rep, '%Y-%m-%d_%H:%M:%S.%f')
+    return datetime.strptime(string_rep, '%Y-%m-%d_%H:%M:%S')
   
   # this returns the filename (full path)
   # of the most recent checkpoint

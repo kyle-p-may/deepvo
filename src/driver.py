@@ -1,5 +1,6 @@
 import datetime
 import torch
+import numpy as np
 
 from model import DeepVOModel
 from device import DeviceHelper
@@ -49,3 +50,21 @@ class Driver:
     opt = OptimizerFactory.create(params.opt_type, params.lr, model)
 
     return model, opt
+  
+  def evalOnVideo(model, ds, outputfile):
+    
+    predicted_poses = []
+    model.eval()
+    with torch.no_grad():
+      for i in range(len(ds)):
+        if i % 200 == 0:
+          print('At frame ' + str(i) + ' of ' + str(len(ds)))
+        stacked_frame, _, _ = ds[i]
+
+        stacked_frame.cuda()
+        assert stacked_frame.is_cuda, 'tensor should be on gpu'
+        prediction = model.eval_forward(stacked_frame).squeeze().cpu()
+        predicted_poses.append( prediction.numpy() )
+
+      pred = np.stack(predicted_poses)
+      np.save(outputfile, pred)

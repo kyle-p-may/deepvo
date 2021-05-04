@@ -72,6 +72,19 @@ class DeepVOModel(nn.Module):
     x = self.rnn_dropout(x)
     return self.linear(x)
 
+  def eval_forward(self, x):
+    # this will be {batch, seq, channel, width, height}
+    # and we want to concatenate along channel
+    batch_size = x.size(0)
+    seq_len = x.size(1)
+    x = x.view(batch_size * seq_len, x.size(2), x.size(3), x.size(4))
+    x = self.network0(x)
+    x = x.view(batch_size, seq_len, -1)
+
+    x, _ = self.rnn(x)
+    x = self.rnn_dropout(x)
+    return self.linear(x)
+
   
   def loss(self, predicted, ground_truth):
     # both predicted and ground truth have the following structure

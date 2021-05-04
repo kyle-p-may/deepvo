@@ -17,12 +17,12 @@ def ImportPretrainedModel(model, path, location):
     'conv4.1' : 'network0.4.layer.1',
     'conv4_1.0' : 'network0.5.layer.0',
     'conv4_1.1' : 'network0.5.layer.1',
-    'conv5.0' : 'network.6.layer.0',
-    'conv5.1' : 'network.6.layer.1',
-    'conv5_1.0' : 'network.7.layer.0',
-    'conv5_1.1' : 'network.7.layer.1',
-    'conv6.0' : 'network.8.layer.0',
-    'conv6.1' : 'network.8.layer.1',
+    'conv5.0' : 'network0.6.layer.0',
+    'conv5.1' : 'network0.6.layer.1',
+    'conv5_1.0' : 'network0.7.layer.0',
+    'conv5_1.1' : 'network0.7.layer.1',
+    'conv6.0' : 'network0.8.layer.0',
+    'conv6.1' : 'network0.8.layer.1',
     'rnn' : 'rnn',
     'linear' : 'linear'
   }

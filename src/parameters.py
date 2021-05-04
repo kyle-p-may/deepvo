@@ -23,6 +23,8 @@ class NewDeepVOParameters:
     self.log_file = 'C:\\Users\\kylep\\Documents\\projects\\deepvo\\data\\history.txt'
     self.image_dir = 'C:\\Users\\kylep\\Documents\\projects\\deepvo\\data\\sequences'
     self.pose_dir = 'C:\\Users\\kylep\\Documents\\projects\\deepvo\\data\\poses'
+    self.pred_dir = 'C:\\Users\\kylep\\Documents\\projects\\deepvo\\data\\predicted'
+    self.result_dir = 'C:\\Users\\kylep\\Documents\\projects\\deepvo\\data\\results'
     self.pretrained_path = 'C:\\Users\\kylep\\Documents\\projects\\deepvo\\model\\pretrained\\t000102050809_v04060710_im184x608_s5x7_b8_rnn1000_optAdagrad_lr0.0005.model.train'
     self.checkpoint_path = 'C:\\Users\\kylep\\Documents\\projects\\deepvo\\model'
 

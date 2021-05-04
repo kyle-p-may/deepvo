@@ -81,19 +81,41 @@ class Preprocessor:
       
       with open(inputfile) as inputstream:
         lines = inputstream.readlines()
-        all_poses = np.array()
+        all_poses = []
         for line in lines:
           kitti_pose = [float(f) for f in line.split()]
           kitti_pose = np.array(kitti_pose)
           assert(kitti_pose.shape == (12,)), 'expecting kitti pose to length 12'
           deepvo_pose = Poses.translateFromKittiToDeepvo(kitti_pose)
 
-          combined_poses = np.concatenate(deepvo_pose, kitti_pose)
-          all_poses = np.concatenate(all_poses, combined_poses)
+          combined_poses = np.concatenate((deepvo_pose, kitti_pose))
+          all_poses.append( combined_poses )
 
-        all_poses.reshape((-1, 18))
-        np.save(output_file, all_poses)
-        print('Saved output at ' + output_file)
+        ap = np.stack( all_poses )
+        np.save(outputfile, ap)
+        print('Saved output at ' + outputfile)
+    
+  def ProcessImages(image_dir, seq_info, output_dir, transform=None):
+    for seq, start, end in seq_info:
+
+      print('Processing seq [' + str(seq) + '] from ' + str(start) + ' to ' + str(end))
+      for img_index in range(start, end+1):
+        if img_index % 200 == 0:
+          print('Img number: ' + str(img_index))
+
+        basename = str(img_index).zfill(10) + '.png'
+        basename_output = str(img_index).zfill(10)  + '.npy'
+        full_image_path = os.path.join(image_dir, seq, basename)
+        full_output_path = os.path.join(output_dir, seq, basename_output)
+
+        assert os.path.exists(full_image_path), 'expecting that this photo exists'
+        i = torchvision.io.read_image(full_image_path)
+        i = i / 255.0
+        if transform:
+          i = transform(i)
+        final_i = i.numpy()
+
+        np.save(full_output_path, final_i)
 
   def ValidFile(sequence_number, photo_number):
     valid_ranges = {
