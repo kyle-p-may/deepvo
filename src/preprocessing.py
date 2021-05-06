@@ -7,16 +7,9 @@ import torchvision.transforms as transforms
 from poses import Poses
 from parameters import params
 
-class CenterToZeroAndSubtractMean(object):
-  def __init__(self, channel_means):
-    self.channel_means = channel_means
-    
+class CenterToZero:
   def __call__(self, pic):
-    num_channels = self.channel_means.shape[0]
-    assert num_channels == pic.shape[0], 'expecting same number of channels'
-    for c in range(num_channels):
-      pic[c, :, :] = pic[c, :, :] - 0.5 - self.channel_means[c]
-    
+    pic = pic - 0.5
     return pic
 
     
@@ -24,9 +17,10 @@ class Preprocessor:
   def LoadMeans(mean_file):
     return np.load(mean_file)
 
-  def TransformFactory(means):
+  def TransformFactory(means, stddevs):
     return transforms.Compose([
-            CenterToZeroAndSubtractMean(means),
+            CenterToZero(),
+            transforms.Normalize(mean=means, std=stddevs),
             transforms.Resize((params.img_height, params.img_width))
           ])
 
@@ -116,7 +110,28 @@ class Preprocessor:
         final_i = i.numpy()
 
         np.save(full_output_path, final_i)
+    
+  def CollectImages(image_dir, seq_info, output_dir):
+    for seq, start, end in seq_info:
 
+      print('Processing seq [' + str(seq) + '] from ' + str(start) + ' to ' + str(end))
+      all = []
+      for img_index in range(start, end+1):
+        if img_index % 200 == 0:
+          print('Img number: ' + str(img_index))
+
+        basename = str(img_index).zfill(10) + '.npy'
+        basename_output = 'all.npy'
+        full_image_path = os.path.join(image_dir, seq, basename)
+        full_output_path = os.path.join(output_dir, seq, basename_output)
+
+        assert os.path.exists(full_image_path), 'expecting that this photo exists'
+        i = np.load(full_image_path)
+        all.append( i )
+
+      vid = np.stack(all)
+      np.save(full_output_path, vid)
+    
   def ValidFile(sequence_number, photo_number):
     valid_ranges = {
       '00': ('0000000000', '0000004540'),

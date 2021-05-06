@@ -61,7 +61,6 @@ class DeepVOModel(nn.Module):
   def forward(self, x):
     # this will be {batch, seq, channel, width, height}
     # and we want to concatenate along channel
-    x = torch.cat(( x[:, :-1], x[:, 1:]), dim=2)
     batch_size = x.size(0)
     seq_len = x.size(1)
     x = x.view(batch_size * seq_len, x.size(2), x.size(3), x.size(4))
@@ -99,12 +98,13 @@ class DeepVOModel(nn.Module):
     return kappa * angle_loss + pos_loss
   
   def training_step(self, batch):
-    images, poses, _ = batch
+    images, poses = batch
     predictions = self(images)
-    training_loss = self.loss(predictions.float(), poses[:, :-1].float())
+    training_loss = self.loss(predictions.float(), poses.float())
     return training_loss
   
   def validation_step(self, batch):
-    images, poses, _ = batch
+    images, poses = batch
     out = self(images)
-    val_loss = self.loss(out.float(), poses[:, :-1].float())
+    val_loss = self.loss(out.float(), poses.float())
+    return val_loss

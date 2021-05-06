@@ -7,6 +7,7 @@ from device import DeviceHelper
 from pretrained import ImportPretrainedModel
 from checkpoint import Checkpointer
 from optfactory import OptimizerFactory
+from dataset import RandomInMemoryVideoDataset
 
 class Driver:
   def evaluate(model, v_dl, epoch):
@@ -15,10 +16,11 @@ class Driver:
     print ('Epoch: ' + str(epoch) + ' -> Loss: ' + str(epoch_loss))
     return epoch_loss
 
-  def fit(epochs, model, t_dl, v_dl, optimizer):
+  def fit(epochs, model, optimizer, params, cp):
     history = []
 
     for epoch in range(epochs):
+      t_dl, v_dl = RandomInMemoryVideoDataset.DataLoaderFactory(params)
       print('Epoch[' + str(epoch) + ']: ' + str(datetime.datetime.now())) 
       model.train()
       for batch in t_dl:
@@ -28,8 +30,11 @@ class Driver:
         optimizer.zero_grad()
       
       model.eval()
-      result = evaluate(model, v_dl, epoch)
-      history.append( (epoch, result) )
+      with torch.no_grad():
+        result = Driver.evaluate(model, v_dl, epoch)
+        history.append( (epoch, result) )
+
+      cp.CreateCheckpoint(model, optimizer, epoch, None, params.checkpoint_tag, epoch)
     
     return history
   
@@ -40,31 +45,34 @@ class Driver:
 
     if params.load_pretrained:
       ImportPretrainedModel(model, params.pretrained_path, dh.device)
+      opt = OptimizerFactory.create(params.opt_type, params.lr, model)
     else:
       # load checkpoint
-      cp.LoadFromCheckpoint(model, opt)
+      opt = OptimizerFactory.create(params.opt_type, params.lr, model)
+      cp.LoadFromCheckpoint(model, opt, params.checkpoint_tag, params.checkpoint_i)
 
     if torch.cuda.is_available():
       model.cuda()
-
-    opt = OptimizerFactory.create(params.opt_type, params.lr, model)
 
     return model, opt
   
   def evalOnVideo(model, ds, outputfile):
     
-    predicted_poses = []
+    # just assume that this is the base pose for now
+    predicted_rel_poses = [np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])]
+
     model.eval()
     with torch.no_grad():
       for i in range(len(ds)):
         if i % 200 == 0:
           print('At frame ' + str(i) + ' of ' + str(len(ds)))
-        stacked_frame, _, _ = ds[i]
+        stacked_frame, _ = ds[i]
 
         stacked_frame.cuda()
         assert stacked_frame.is_cuda, 'tensor should be on gpu'
         prediction = model.eval_forward(stacked_frame).squeeze().cpu()
-        predicted_poses.append( prediction.numpy() )
+        predicted_rel_poses.append( prediction.numpy() )
 
-      pred = np.stack(predicted_poses)
+      pred = np.stack(predicted_rel_poses)
+      pred = pred[1:, :] + pred[:-1, :] # calculate the absolutes
       np.save(outputfile, pred)

@@ -26,23 +26,29 @@ class NewDeepVOParameters:
     self.pred_dir = 'C:\\Users\\kylep\\Documents\\projects\\deepvo\\data\\predicted'
     self.result_dir = 'C:\\Users\\kylep\\Documents\\projects\\deepvo\\data\\results'
     self.pretrained_path = 'C:\\Users\\kylep\\Documents\\projects\\deepvo\\model\\pretrained\\t000102050809_v04060710_im184x608_s5x7_b8_rnn1000_optAdagrad_lr0.0005.model.train'
+    #self.pretrained_path = 'C:\\Users\\kylep\\Documents\\projects\\deepvo\\model\\pretrained\\flownets_bn_EPE2.459.pth.tar'
     self.checkpoint_path = 'C:\\Users\\kylep\\Documents\\projects\\deepvo\\model'
+    self.checkpoint_tag = 'cp'
+    self.checkpoint_i = 21
 
     self.training_sequences = [('00', 0, 4540), ('02', 0, 4660), ('08', 1100, 5170), ('09', 0, 1590)]
     self.eval_sequences = [('01', 0, 1100), ('05', 0, 2760), ('06', 0, 1100), ('07', 0, 1100), ('10', 0, 1200)]
 
-    self.training_traj_length = 5
-    self.eval_traj_length = 10
-    self.epochs = 1
+    self.training_traj_length = 15
+    self.eval_traj_length = 15
+    self.epochs = 50
     self.batch_size = 1
 
     self.load_pretrained = True
     self.load_cp = False
 
-    self.torch_location = torch.device('cuda')
+    self.torch_location = torch.device('cuda:0')
 
     self.opt_type = 'Adagrad'
-    self.lr = 0.005
+    self.lr = 0.015
+
+    self.img_means = (0.19007764876619865, 0.15170388157131237, 0.10659445665650864)
+    self.img_stds = (0.2610784009469139, 0.25729316928935814, 0.25163823815039915)        
   
   def print(self):
     print('Current Hyperparameter Values')

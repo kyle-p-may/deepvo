@@ -4,6 +4,7 @@ import torch
 from torch.utils.data.dataset import Dataset
 from torch.utils.data.dataloader import DataLoader
 import torchvision
+import random
 
 import poses as P
 import preprocessing as Prep
@@ -16,13 +17,18 @@ class Helper:
   def loadConsecutiveFrames(path, seq, start, end):
     image_sequence = []
     for img_index in range(start, end+1):
-      basename = createFrameName(img_index)
+      basename = Helper.createFrameName(img_index)
       full_image_path = os.path.join(path, seq, basename)
       assert os.path.exists(full_image_path), 'expecting that this photo exists'
       i = np.load(full_image_path)
       image_sequence.append( i )
 
     return np.stack(image_sequence)
+  
+  def selectRange(start, end, length):
+    range_end = max(end-length, start)
+    idx = random.randint(start, range_end)
+    return idx, min(idx + length, end), min(end-start, length)
   
 # this will provide an interface to an entire video
 class SingleVideo(Dataset):
@@ -34,8 +40,7 @@ class SingleVideo(Dataset):
 
     full_pose_name = os.path.join(pose_dir, self.seq + '_poses.npy')
     raw_poses = np.load(full_pose_name)
-    self.poses = raw_poses[:, :5]
-    self.kitti_poses = raw_poses[:, 6:]
+    self.poses = raw_poses[:, :6]
 
   def __len__(self):
     return (self.end - self.start + 1) - 1
@@ -48,11 +53,67 @@ class SingleVideo(Dataset):
     i = torch.from_numpy(np.load(path))
     next_i = torch.from_numpy(np.load(path))
     p = torch.from_numpy(self.poses[idx, :])
-    kp = torch.from_numpy(self.kitti_poses[idx, :])
 
-    im = torch.cat((i, next_i))
+    im = torch.cat((next_i, i))
     im = im[None, None, :, :, :]
-    return (im, p, kp)
+    return (im, p)
+
+class RandomInMemoryVideoDataset:
+  def DataLoaderFactory(params):
+    training_ds = RandomInMemoryVideoDataset(
+      params.image_dir,
+      params.pose_dir,
+      params.training_sequences,
+      params.training_traj_length
+    )
+
+    eval_ds = RandomInMemoryVideoDataset(
+      params.image_dir,
+      params.pose_dir,
+      params.eval_sequences,
+      params.eval_traj_length
+    )
+    
+    t_dl = DataLoader(training_ds, batch_size=params.batch_size, shuffle=True, pin_memory=True)
+    e_dl = DataLoader(eval_ds, batch_size=params.batch_size*2, pin_memory=True)
+    return DeviceDataLoader(t_dl), DeviceDataLoader(e_dl)
+
+  def __init__(self, image_dir, pose_dir, seq_info, trajectory_length, transform=None):
+    self.length = 1200
+    super().__init__()
+
+    si = random.choice(seq_info)
+    self.seq, self.start, self.end = si
+    self.traj_length = trajectory_length
+    self.tl = self.traj_length
+
+    self.start, self.end, self.length = Helper.selectRange(self.start, self.end, self.length+1)
+    self.length = self.length - trajectory_length
+
+    self.image_dir = image_dir
+    self.pose_dir = pose_dir
+
+    pose_file = os.path.join(self.pose_dir, self.seq + '_poses.npy') 
+
+    # find the relative poses
+    combined_poses = np.load(pose_file)
+    pose_start = self.start - si[1]
+    pose_end = self.end - si[1] + 1
+    poses = combined_poses[pose_start:pose_end, :6]
+    self.poses = torch.from_numpy(poses[1:, :] - poses[:-1, :])
+
+    images = Helper.loadConsecutiveFrames(image_dir, self.seq, self.start, self.end)
+    self.sequence = torch.from_numpy(images)
+
+    assert self.sequence.shape[0] == self.poses.shape[0] + 1, 'poses and seq should be same'
+
+  def __len__(self):
+    return self.length
+
+  def __getitem__(self, idx):
+    end = idx + self.tl - 1
+    stack = torch.cat((self.sequence[idx+1:end+1], self.sequence[idx:end]), dim=1)
+    return stack, self.poses[idx:end]
 
 class VideoDataset(Dataset):
 
@@ -61,16 +122,14 @@ class VideoDataset(Dataset):
       params.image_dir,
       params.pose_dir,
       params.training_sequences,
-      params.training_traj_length,
-      Prep.Preprocessor.TransformFactory(Prep.Preprocessor.LoadMeans(params.mean_file))
+      params.training_traj_length
     )
 
     eval_ds = VideoDataset(
       params.image_dir,
       params.pose_dir,
       params.eval_sequences,
-      params.eval_traj_length,
-      Prep.Preprocessor.TransformFactory(Prep.Preprocessor.LoadMeans(params.mean_file))
+      params.eval_traj_length
     )
     
     t_dl = DataLoader(training_ds, batch_size=params.batch_size, shuffle=True, pin_memory=True)
@@ -104,17 +163,14 @@ class VideoDataset(Dataset):
     self.transform = transform
     self.seq_info = {}
     self.seq_poses = {}
-    self.seq_kitti_poses = {}
     for seq, start, end in seq_info:
       self.seq_info[seq] = (start, end)
       pose_file = os.path.join(self.pose_dir, seq + '_poses.npy') 
 
       pose = []
-      kitti_pose = []
-
       combined_poses = np.load(pose_file)
-      self.seq_poses[seq] = combined_poses[:, :5]
-      self.seq_kitti_poses[seq] = combined_poses[:, 6:]
+
+      self.seq_poses[seq] = combined_poses[:, :6]
       
       for i in range(start, max(end+1-trajectory_length, start+1)):
         traj_end = min(i + trajectory_length, end + 1)
@@ -127,15 +183,17 @@ class VideoDataset(Dataset):
     traj = self.traj_info[idx]
 
     base_img_num, _ = self.seq_info[traj.seq]
+    pose_start = traj.start - base_img_num
+    pose_end = traj.end - base_img_num + 1
+    p = self.seq_poses[traj.seq][pose_start : pose_end, :]
+    p = p[1:, :] - p[:-1, :]
 
-    p = self.seq_poses[traj.seq][traj.start-base_img_num:traj.end-base_img_num, :]
-    kp = self.seq_kitti_poses[traj.seq][traj.start-base_img_num:traj.end-base_img_num, :]
-
-    images = Helper.loadConsecutiveFrames(self.image_dir, seq, start, end)
+    images = Helper.loadConsecutiveFrames(self.image_dir, traj.seq, traj.start, traj.end)
 
     sample = {
       'sequence': torch.from_numpy(images),
-      'poses': torch.from_numpy(p),
-      'kitti_poses': torch.from_numpy(kp)
+      'poses': torch.from_numpy(p)
     }
-    return (sample['sequence'], sample['poses'], sample['kitti_poses'])
+
+    sample['sequence'] = torch.cat((sample['sequence'][:-1], sample['sequence'][1:]), dim=1)
+    return (sample['sequence'], sample['poses'])
